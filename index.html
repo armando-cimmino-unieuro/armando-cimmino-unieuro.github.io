@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Action Analyzer — Unileaks</title>
+<style>
+:root {
+  --bg: #f5f6f8;
+  --surface: #fff;
+  --border: #dde1e6;
+  --text: #1a1a2e;
+  --text-sec: #555;
+  --accent: #2563eb;
+  --accent-light: #eff4ff;
+  --red: #dc2626;
+  --orange: #ea580c;
+  --yellow: #ca8a04;
+  --green: #16a34a;
+  --teal: #0d9488;
+  --purple: #7c3aed;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.5;
+}
+
+/* ── Header ── */
+header {
+  background: var(--text); color: #fff; padding: 14px 24px;
+  display: flex; align-items: center; gap: 16px;
+  position: sticky; top: 0; z-index: 100;
+}
+header h1 { font-size: 18px; font-weight: 600; letter-spacing: .3px; }
+header .subtitle { font-size: 13px; opacity: .65; }
+header .case-nav {
+  margin-left: auto; display: flex; align-items: center; gap: 8px;
+}
+header .case-nav select {
+  padding: 5px 10px; border-radius: 4px;
+  border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.12);
+  color: #fff; font-size: 13px; cursor: pointer;
+}
+header .case-nav select option { color: #000; background: #fff; }
+header .case-nav .counter { font-size: 12px; opacity: .6; }
+.hdr-btn {
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
+  color: #fff; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+}
+.hdr-btn:hover { background: rgba(255,255,255,.25); }
+.hdr-btn.loaded { background: var(--green); border-color: var(--green); }
+
+/* ── Drop zone ── */
+.drop-zone {
+  max-width: 600px; margin: 80px auto;
+  border: 2px dashed var(--border); border-radius: 12px;
+  padding: 60px 40px; text-align: center; cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+.drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: var(--accent-light); }
+.drop-zone h2 { font-size: 20px; margin-bottom: 8px; }
+.drop-zone p { color: var(--text-sec); font-size: 14px; }
+.drop-zone input { display: none; }
+
+#app { display: none; max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+/* ── Cards ── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 12px; overflow: hidden;
+}
+.card-header {
+  padding: 12px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  user-select: none; font-weight: 600; font-size: 14px; transition: background .15s;
+}
+.card-header:hover { background: #f9fafb; }
+.card-header .chevron {
+  width: 18px; height: 18px; transition: transform .2s; flex-shrink: 0; opacity: .5;
+}
+.card-header .chevron.open { transform: rotate(90deg); }
+.card-header .badge {
+  margin-left: auto; font-size: 11px; font-weight: 500; padding: 2px 8px;
+  border-radius: 10px; background: #f0f0f0; color: var(--text-sec);
+}
+.card-body { display: none; padding: 0 16px 14px; font-size: 13px; }
+.card-body.open { display: block; }
+
+/* ── KV grid ── */
+.kv-grid { display: grid; grid-template-columns: 160px 1fr; gap: 4px 12px; font-size: 13px; }
+.kv-grid dt { color: var(--text-sec); font-weight: 500; }
+.kv-grid dd { font-weight: 400; word-break: break-word; }
+
+/* ── Indicators ── */
+.indicators { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+.indicator {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+  border-radius: 6px; font-size: 12px; font-weight: 600; border: 1px solid;
+}
+.sen-1,.sen-2 { background:#fef2f2; color:var(--red); border-color:#fecaca; }
+.sen-3 { background:#fff7ed; color:var(--orange); border-color:#fed7aa; }
+.sen-4 { background:#f9fafb; color:var(--text-sec); border-color:var(--border); }
+.sen-5 { background:#f0fdf4; color:var(--teal); border-color:#bbf7d0; }
+.sen-6,.sen-7 { background:#ecfdf5; color:var(--green); border-color:#86efac; }
+.sen-null { background:#f9fafb; color:#888; border-color:var(--border); }
+.chr-0 { background:#f9fafb; color:#888; border-color:var(--border); }
+.chr-1 { background:#fefce8; color:var(--yellow); border-color:#fde68a; }
+.chr-2 { background:#fff7ed; color:var(--orange); border-color:#fed7aa; }
+.chr-3 { background:#fef2f2; color:var(--red); border-color:#fecaca; }
+.leg-0 { background:#f9fafb; color:#888; border-color:var(--border); }
+.leg-1 { background:#fff7ed; color:var(--orange); border-color:#fed7aa; }
+.leg-2 { background:#fef2f2; color:var(--red); border-color:#fecaca; }
+
+/* ── Blocks ── */
+.reconstruction {
+  background: #fafbfc; border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px 14px; white-space: pre-wrap; font-size: 13px; line-height: 1.65;
+}
+.notes-block {
+  background: #f8f9fa; border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px 14px; white-space: pre-wrap; font-size: 13px; line-height: 1.6;
+}
+
+/* ── Action cards ── */
+.action-card {
+  background: #fefce8; border: 1px solid #fde68a; border-radius: 6px;
+  padding: 10px 14px; margin-bottom: 8px;
+}
+.action-card .action-ref { font-weight: 700; font-size: 13px; color: var(--yellow); }
+.action-card .action-ref.missing { color: var(--red); }
+.action-card .action-det { margin-top: 4px; font-size: 12px; color: var(--text); }
+.action-card .action-comms { margin-top: 4px; font-size: 11px; color: var(--text-sec); }
+
+/* ── Comm links ── */
+.comm-link {
+  display: inline-block; background: rgba(0,0,0,.06); padding: 1px 6px;
+  border-radius: 3px; margin: 1px 2px; font-family: monospace; font-size: 11px;
+  cursor: pointer; text-decoration: none; color: var(--accent); border: 1px solid transparent;
+  transition: background .15s, border-color .15s;
+}
+.comm-link:hover { background: var(--accent-light); border-color: var(--accent); }
+.comm-link.no-data { color: var(--text-sec); cursor: default; }
+.comm-link.no-data:hover { background: rgba(0,0,0,.06); border-color: transparent; }
+
+/* ── Thread cards ── */
+.thread-card { border-left: 3px solid var(--accent); }
+.thread-card .thread-title { display: flex; align-items: center; gap: 8px; }
+.thread-card .thread-title .tid {
+  background: var(--accent); color: #fff; border-radius: 4px;
+  padding: 1px 7px; font-size: 12px; font-weight: 700;
+}
+
+/* ── Tables ── */
+.comm-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+.comm-table th {
+  text-align: left; padding: 6px 8px; background: #f3f4f6; font-weight: 600;
+  border-bottom: 1px solid var(--border); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .4px; color: var(--text-sec);
+}
+.comm-table td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+.comm-table tr:hover td { background: #f9fafb; }
+.comm-table .mono { font-family: monospace; font-size: 12px; }
+.comm-table .highlight td { background: #fef3c7 !important; }
+
+.product-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+.product-table th {
+  text-align: left; padding: 6px 8px; background: #f3f4f6; font-weight: 600;
+  border-bottom: 1px solid var(--border); font-size: 11px;
+}
+.product-table td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; }
+
+.section-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--text-sec); font-weight: 600; margin: 14px 0 6px;
+}
+.btn-small {
+  font-size: 11px; padding: 2px 8px; border: 1px solid var(--border);
+  border-radius: 4px; cursor: pointer; background: var(--surface); color: var(--text-sec);
+}
+.btn-small:hover { background: #f3f4f6; }
+.btn-small.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.stats-row { display: flex; gap: 16px; flex-wrap: wrap; margin: 8px 0; }
+.stat-box {
+  text-align: center; padding: 8px 14px; background: #f9fafb;
+  border-radius: 6px; border: 1px solid var(--border); min-width: 80px;
+}
+.stat-box .stat-val { font-size: 22px; font-weight: 700; color: var(--accent); }
+.stat-box .stat-lbl { font-size: 10px; color: var(--text-sec); text-transform: uppercase; letter-spacing: .3px; }
+
+/* ── Modal ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  z-index: 1000; justify-content: center; align-items: flex-start; padding: 60px 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface); border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.2);
+  max-width: 740px; width: 100%; max-height: calc(100vh - 120px); overflow-y: auto;
+}
+.modal-header {
+  position: sticky; top: 0; background: var(--surface); padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px;
+  z-index: 1;
+}
+.modal-header h3 { font-size: 15px; flex: 1; }
+.modal-close {
+  width: 28px; height: 28px; border: none; background: #f3f4f6; border-radius: 6px;
+  cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-sec);
+}
+.modal-close:hover { background: #e5e7eb; }
+.modal-body { padding: 16px 20px 20px; }
+.modal-body .comm-body {
+  background: #f8f9fa; border: 1px solid var(--border); border-radius: 6px;
+  padding: 14px 16px; white-space: pre-wrap; font-size: 13px; line-height: 1.65;
+  font-family: inherit; max-height: 400px; overflow-y: auto;
+}
+.modal-nav {
+  display: flex; gap: 6px;
+}
+.modal-nav button {
+  padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px;
+  background: var(--surface); cursor: pointer; font-size: 12px; color: var(--text-sec);
+}
+.modal-nav button:hover { background: #f3f4f6; }
+.modal-nav button:disabled { opacity: .35; cursor: default; }
+
+/* ── All-comms table ── */
+.all-comms-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+.all-comms-table th {
+  text-align: left; padding: 6px 8px; background: #f3f4f6; font-weight: 600;
+  border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase;
+  letter-spacing: .4px; color: var(--text-sec); position: sticky; top: 0;
+}
+.all-comms-table td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+.all-comms-table tr:hover td { background: #f9fafb; }
+.all-comms-table tr { cursor: pointer; }
+.all-comms-table .body-preview {
+  max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text-sec); font-size: 11px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Action Analyzer</h1>
+    <div class="subtitle">Unileaks — Analisi output Action Identifier</div>
+  </div>
+  <div class="case-nav" id="case-nav" style="display:none">
+    <select id="case-select"></select>
+    <span class="counter" id="case-counter"></span>
+    <button class="hdr-btn" id="btn-comms" onclick="document.getElementById('comms-file-input').click()" title="Carica il file JSON di input con le comunicazioni originali">Carica comunicazioni</button>
+    <input type="file" id="comms-file-input" accept=".json" style="display:none">
+    <button class="hdr-btn" onclick="resetApp()">Nuovo file</button>
+  </div>
+</header>
+
+<div class="drop-zone" id="drop-zone">
+  <h2>Carica output JSON</h2>
+  <p>Trascina il file qui oppure clicca per selezionarlo.<br>
+  Supporta output singolo, batch e formato espanso.</p>
+  <input type="file" id="file-input" accept=".json">
+</div>
+
+<div id="app"></div>
+
+<!-- Modal comunicazione -->
+<div class="modal-overlay" id="comm-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Comunicazione</h3>
+      <div class="modal-nav">
+        <button id="modal-prev" onclick="modalNav(-1)">&larr; Prec</button>
+        <button id="modal-next" onclick="modalNav(1)">Succ &rarr;</button>
+      </div>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+const SENTIMENT = {1:'Molto Negativo',2:'Negativo',3:'Abbastanza Negativo',4:'Neutro',5:'Abbastanza Positivo',6:'Positivo',7:'Molto Positivo'};
+const CHURN = {0:'Nullo',1:'Basso',2:'Medio',3:'Alto'};
+const LEGAL = {0:'Nessuno',1:'Minaccia',2:'Azione Legale'};
+const ROLE = {AP:'Apertura',SO:'Sollecito',IF:'Info aggiuntiva',RI:'Risposta',AZ:'Azione',ES:'Escalation',AG:'Aggiornamento'};
+const CHANNEL = {E:'Email',T:'Telefono',W:'Web',S:'Self',J:'Jira',WC:'Webcare',CO:'Corriere',PE:'PEC',TP:'Trustpilot',PV:'Punto Vendita',QU:'Qualtrics',OD:'ODR',AC:'Altroconsumo','-':'N/A'};
+
+function esc(s) {
+  if (s == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+function senClass(v) { return v == null ? 'sen-null' : `sen-${v}`; }
+function chrClass(v) { return `chr-${v ?? 0}`; }
+function legClass(v) { return `leg-${v ?? 0}`; }
+function senLabel(v) { return v == null ? 'N/D' : (SENTIMENT[v] ?? v); }
+function chrLabel(v) { return v == null ? 'N/D' : (CHURN[v] ?? v); }
+function legLabel(v) { return LEGAL[v] ?? v ?? 'N/A'; }
+function roleLabel(v) { return ROLE[v] ?? v; }
+function chLabel(v) { return CHANNEL[v] ?? v; }
+function resolveSubject(code) { return code === '-' ? 'N/A' : `S.${code}`; }
+
+function chevronSvg() {
+  return '<svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"/></svg>';
+}
+function toggleCard(el) {
+  el.nextElementSibling.classList.toggle('open');
+  el.querySelector('.chevron').classList.toggle('open');
+}
+
+/* ──────────────────── State ──────────────────── */
+let cases = [];
+let commsDb = {};       // orderId -> { commId -> commObj }
+let currentCaseIdx = 0;
+let currentModalOrderId = null;
+let currentModalCommId = null;
+
+/* ──────────────────── Parsing ──────────────────── */
+function parseCases(data) {
+  if (data.metadata && data.results) {
+    return data.results.map((r, i) => {
+      const caseId = r.case_id ?? `case_${i}`;
+      return { caseId, ...extractCompact(r.result ?? r) };
+    });
+  }
+  if (data.expanded_results) {
+    return data.expanded_results.map((r, i) => ({
+      caseId: r.case_id ?? `case_${i}`, compact: null, extra: r, isExpanded: true
+    }));
+  }
+  const c = extractCompact(data);
+  c.caseId = c.extra?.order_details?.order_id ?? c.compact?.sum?.oid ?? 'Caso singolo';
+  return [c];
+}
+
+function extractCompact(data) {
+  if (data.thread_analysis) {
+    return {
+      compact: data.thread_analysis, isExpanded: false,
+      extra: { order_details: data.order_details, notes: data.notes, mode: data.mode, communications: data.communications }
+    };
+  }
+  if (data.sum && data.thr) return { compact: data, extra: { notes: data.notes }, isExpanded: false };
+  if (data.summary && data.threads) return { compact: null, extra: data, isExpanded: true };
+  return { compact: data, extra: {}, isExpanded: false };
+}
+
+function getOrderIdForCase(c) {
+  if (c.isExpanded) return c.extra?.summary?.order_id ?? c.extra?.order_details?.order_id ?? c.caseId;
+  return c.compact?.sum?.oid ?? c.extra?.order_details?.order_id ?? c.caseId;
+}
+
+function getCommsForCase(c) {
+  const oid = getOrderIdForCase(c);
+  return commsDb[oid] ?? null;
+}
+
+function hasCommsLoaded() { return Object.keys(commsDb).length > 0; }
+
+/* ──────────────────── Comms DB loading ──────────────────── */
+function loadCommsFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      let arr = Array.isArray(data) ? data : [data];
+      let count = 0;
+      arr.forEach(caseObj => {
+        const oid = caseObj.order_details?.order_id;
+        if (!oid) return;
+        const map = {};
+        (caseObj.communications ?? []).forEach(comm => {
+          map[String(comm.id ?? Object.keys(map).length)] = comm;
+        });
+        commsDb[oid] = map;
+        count += Object.keys(map).length;
+      });
+      document.getElementById('btn-comms').classList.add('loaded');
+      document.getElementById('btn-comms').textContent = `Comms caricate (${count})`;
+      renderCase(currentCaseIdx);
+    } catch(err) {
+      alert('Errore parsing comunicazioni: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ──────────────────── Comm link helper ──────────────────── */
+function commLink(commId, orderId) {
+  const id = String(commId);
+  const cMap = commsDb[orderId];
+  if (cMap && cMap[id]) {
+    return `<a class="comm-link" onclick="openModal('${esc(orderId)}',${id})" title="Apri comunicazione ${id}">${id}</a>`;
+  }
+  return `<span class="comm-link no-data" title="Comunicazione ${id} — dati non caricati">${id}</span>`;
+}
+
+function commIdCell(commId, orderId) {
+  const id = String(commId);
+  const cMap = commsDb[orderId];
+  if (cMap && cMap[id]) {
+    return `<td class="mono"><a class="comm-link" onclick="openModal('${esc(orderId)}',${id})" style="font-size:12px">${id}</a></td>`;
+  }
+  return `<td class="mono">${id}</td>`;
+}
+
+/* ──────────────────── Modal ──────────────────── */
+function openModal(orderId, commId) {
+  currentModalOrderId = orderId;
+  currentModalCommId = commId;
+  renderModal();
+  document.getElementById('comm-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('comm-modal').classList.remove('open');
+  currentModalOrderId = null;
+  currentModalCommId = null;
+}
+
+function modalNav(delta) {
+  const cMap = commsDb[currentModalOrderId];
+  if (!cMap) return;
+  const ids = Object.keys(cMap).map(Number).sort((a,b) => a - b);
+  const cur = ids.indexOf(currentModalCommId);
+  const next = cur + delta;
+  if (next >= 0 && next < ids.length) {
+    currentModalCommId = ids[next];
+    renderModal();
+  }
+}
+
+function renderModal() {
+  const cMap = commsDb[currentModalOrderId];
+  if (!cMap) return;
+  const comm = cMap[String(currentModalCommId)];
+  if (!comm) return;
+
+  const ids = Object.keys(cMap).map(Number).sort((a,b) => a - b);
+  const cur = ids.indexOf(currentModalCommId);
+  document.getElementById('modal-prev').disabled = cur <= 0;
+  document.getElementById('modal-next').disabled = cur >= ids.length - 1;
+  document.getElementById('modal-title').textContent = `Comunicazione #${currentModalCommId}`;
+
+  let html = `<dl class="kv-grid" style="margin-bottom:12px">
+    <dt>ID</dt><dd><strong>${currentModalCommId}</strong></dd>
+    <dt>Tipo</dt><dd>${esc(comm.type)}</dd>
+    <dt>Timestamp</dt><dd>${esc(comm.timestamp)}</dd>
+    <dt>Ticket</dt><dd>${esc(comm.ticket_id ?? 'N/A')} (${esc(comm.ticket_origin ?? '')})</dd>
+    <dt>Stato ticket</dt><dd>${esc(comm.ticket_status ?? '')}</dd>
+    <dt>Creazione ticket</dt><dd>${esc(comm.ticket_create_date ?? '')}</dd>
+    <dt>Chiusura ticket</dt><dd>${esc(comm.ticket_close_date ?? '')}</dd>
+    <dt>Parent ticket</dt><dd>${esc(comm.parent_ticket ?? 'N/A')}</dd>
+    <dt>Owner</dt><dd>${esc(comm.owner ?? '')}</dd>`;
+  if (comm.from) html += `<dt>Da</dt><dd>${esc(comm.from)}</dd>`;
+  if (comm.to) html += `<dt>A</dt><dd>${esc(comm.to)}</dd>`;
+  if (comm.subject) html += `<dt>Soggetto</dt><dd>${esc(comm.subject)}</dd>`;
+  html += `</dl>
+    <div class="section-label">Corpo</div>
+    <div class="comm-body">${esc(comm.body ?? '(vuoto)')}</div>`;
+
+  document.getElementById('modal-body').innerHTML = html;
+}
+
+document.getElementById('comm-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('comm-modal')) closeModal();
+});
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('comm-modal').classList.contains('open')) return;
+  if (e.key === 'Escape') closeModal();
+  if (e.key === 'ArrowLeft') modalNav(-1);
+  if (e.key === 'ArrowRight') modalNav(1);
+});
+
+/* ──────────────────── App lifecycle ──────────────────── */
+function resetApp() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('app').innerHTML = '';
+  document.getElementById('drop-zone').style.display = 'block';
+  document.getElementById('case-nav').style.display = 'none';
+  document.getElementById('btn-comms').classList.remove('loaded');
+  document.getElementById('btn-comms').textContent = 'Carica comunicazioni';
+  cases = []; commsDb = {};
+}
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      cases = parseCases(data);
+      document.getElementById('drop-zone').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      setupNav();
+      renderCase(0);
+    } catch(err) {
+      alert('Errore nel parsing JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function setupNav() {
+  const nav = document.getElementById('case-nav');
+  const sel = document.getElementById('case-select');
+  nav.style.display = 'flex';
+  sel.innerHTML = '';
+  cases.forEach((c, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = c.caseId; sel.appendChild(o);
+  });
+  document.getElementById('case-counter').textContent = `${cases.length} caso/i`;
+  sel.onchange = () => renderCase(+sel.value);
+}
+
+function renderCase(idx) {
+  currentCaseIdx = idx;
+  const c = cases[idx];
+  const app = document.getElementById('app');
+  document.getElementById('case-select').value = idx;
+  const orderId = getOrderIdForCase(c);
+
+  if (c.isExpanded) {
+    app.innerHTML = renderExpanded(c.extra, orderId);
+  } else {
+    app.innerHTML = renderCompact(c.compact, c.extra, orderId);
+  }
+  app.querySelectorAll('.card-header').forEach(h => h.addEventListener('click', () => toggleCard(h)));
+}
+
+/* ──────────────────── Compact rendering ──────────────────── */
+function renderCompact(compact, extra, orderId) {
+  const s = compact.sum ?? {};
+  const threads = compact.thr ?? [];
+  const ca = s.ca ?? [];
+  let html = '';
+
+  html += renderSummaryCard(s, threads, ca, extra);
+
+  if (s.rec) {
+    html += `<div class="card">
+      <div class="card-header">${chevronSvg()} Ricostruzione del caso</div>
+      <div class="card-body"><div class="reconstruction">${esc(s.rec)}</div></div>
+    </div>`;
+  }
+
+  if (extra?.order_details) html += renderOrderCard(extra.order_details);
+
+  if (ca.length > 0) {
+    html += `<div class="card">
+      <div class="card-header">${chevronSvg()} Azioni a livello caso <span class="badge">${ca.length} azioni</span></div>
+      <div class="card-body">${ca.map(a => renderActionCard(a, orderId)).join('')}</div>
+    </div>`;
+  }
+
+  threads.forEach(t => { html += renderThreadCard(t, orderId); });
+
+  const cMap = commsDb[orderId];
+  if (cMap) html += renderAllCommsCard(cMap, orderId);
+
+  if (compact.ti_notes) {
+    html += `<div class="card">
+      <div class="card-header">${chevronSvg()} Note Thread Identifier</div>
+      <div class="card-body"><div class="notes-block">${esc(compact.ti_notes)}</div></div>
+    </div>`;
+  }
+  if (extra?.notes) {
+    html += `<div class="card">
+      <div class="card-header">${chevronSvg()} Note Action Identifier</div>
+      <div class="card-body"><div class="notes-block">${esc(extra.notes)}</div></div>
+    </div>`;
+  }
+  return html;
+}
+
+function renderSummaryCard(s, threads, ca, extra) {
+  const totalComms = threads.reduce((n, t) => n + (t.comms?.length ?? 0), 0);
+  const totalActs = ca.length + threads.reduce((n, t) => n + (t.acts?.length ?? 0), 0);
+  const uniqueActions = new Set([...ca.map(a => a.aref), ...threads.flatMap(t => (t.acts ?? []).map(a => a.aref))]);
+
+  let html = `<div class="card">
+    <div class="card-header">${chevronSvg()} Riepilogo caso <span class="badge">${esc(s.oid ?? '')}</span></div>
+    <div class="card-body open">
+      <div class="stats-row">
+        <div class="stat-box"><div class="stat-val">${threads.length}</div><div class="stat-lbl">Thread</div></div>
+        <div class="stat-box"><div class="stat-val">${totalComms}</div><div class="stat-lbl">Comunicazioni</div></div>
+        <div class="stat-box"><div class="stat-val">${totalActs}</div><div class="stat-lbl">Azioni totali</div></div>
+        <div class="stat-box"><div class="stat-val">${uniqueActions.size}</div><div class="stat-lbl">Azioni uniche</div></div>
+      </div>
+      <div class="indicators">
+        <div class="indicator ${senClass(s.sen)}">Sentiment: ${senLabel(s.sen)}</div>
+        <div class="indicator ${chrClass(s.chr)}">Churn: ${chrLabel(s.chr)}</div>
+        <div class="indicator ${legClass(s.leg)}">Legale: ${legLabel(s.leg)}</div>
+      </div>
+      <dl class="kv-grid">
+        <dt>Ordine</dt><dd>${esc(s.oid ?? 'N/A')}</dd>
+        <dt>Pagamento</dt><dd>${esc(s.pm ?? 'N/A')}</dd>
+        <dt>Canale ordine</dt><dd>${esc(s.ch ?? 'N/A')}</dd>`;
+  if (s.pmi) html += `<dt>Pagamento (infer.)</dt><dd>${esc(s.pmi)}</dd>`;
+  if (s.chi) html += `<dt>Canale (infer.)</dt><dd>${esc(s.chi)}</dd>`;
+  if (s.oids?.length) html += `<dt>Altri ordini</dt><dd>${s.oids.map(esc).join(', ')}</dd>`;
+  if (s.bids?.length) html += `<dt>Prenotazioni</dt><dd>${s.bids.map(esc).join(', ')}</dd>`;
+  if (s.xtk?.length) html += `<dt>Ticket esterni</dt><dd>${s.xtk.map(esc).join(', ')}</dd>`;
+  html += `</dl></div></div>`;
+  return html;
+}
+
+function renderOrderCard(od) {
+  let html = `<div class="card">
+    <div class="card-header">${chevronSvg()} Dettagli ordine</div>
+    <div class="card-body">
+      <dl class="kv-grid">
+        <dt>Order ID</dt><dd>${esc(od.order_id)}</dd>
+        <dt>Canale</dt><dd>${esc(od.order_channel)}</dd>
+        <dt>Pagamento</dt><dd>${esc(od.payment_method)}</dd>
+        <dt>Data ordine</dt><dd>${esc(od.order_tsp)}</dd>
+        <dt>Corriere</dt><dd>${esc(od.courier ?? od.courier_code ?? 'N/A')} (${esc(od.courier_type ?? '')})</dd>
+      </dl>`;
+  if (od.products?.length) {
+    html += `<div class="section-label">Prodotti (${od.products.length})</div>
+    <table class="product-table"><thead><tr>
+      <th>SKU</th><th>Descrizione</th><th>Gruppo</th><th>Qty</th><th>Prezzo</th><th>Sconto</th><th>Finale</th><th>Stato</th>
+    </tr></thead><tbody>`;
+    od.products.forEach(p => {
+      html += `<tr>
+        <td class="mono">${esc(p.product)}</td><td>${esc(p.description)}</td>
+        <td>${esc(p.product_group)}</td><td>${p.qty}</td>
+        <td>${p.price?.toFixed(2) ?? ''} &euro;</td><td>${p.promo_discount?.toFixed(2) ?? '-'} &euro;</td>
+        <td><strong>${p.final_price?.toFixed(2) ?? ''} &euro;</strong></td><td>${esc(p.status)}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+function renderActionCard(a, orderId) {
+  const missing = a.ma ? ' missing' : '';
+  const missingTag = a.ma ? ' <span style="color:var(--red);font-size:11px;">[MISSING]</span>' : '';
+  const acm = a.acm ?? [];
+  const commsHtml = acm.map(c => commLink(c, orderId)).join('');
+  return `<div class="action-card">
+    <div class="action-ref${missing}">${esc(a.aref)}${missingTag}
+      <button class="btn-small" style="margin-left:8px" onclick="highlightComms(this, [${acm.join(',')}])">Evidenzia comms</button>
+    </div>
+    <div class="action-det">${esc(a.det)}</div>
+    <div class="action-comms">Comunicazioni: ${commsHtml || '<em>nessuna</em>'}</div>
+  </div>`;
+}
+
+function renderThreadCard(t, orderId) {
+  const comms = t.comms ?? [];
+  const acts = t.acts ?? [];
+  const missingTheme = t.mt ? ' [MISSING THEME]' : '';
+
+  let html = `<div class="card thread-card" id="thread-${t.tid}">
+    <div class="card-header">
+      ${chevronSvg()}
+      <div class="thread-title"><span class="tid">T${t.tid}</span>
+        <span>${esc(t.tref)}${esc(missingTheme)}</span></div>
+      <span class="badge">${comms.length} comms / ${acts.length} azioni</span>
+    </div>
+    <div class="card-body">
+      <div class="indicators">
+        <div class="indicator ${senClass(t.sen)}">Sent: ${senLabel(t.sen)}</div>
+        <div class="indicator ${chrClass(t.chr)}">Churn: ${chrLabel(t.chr)}</div>
+        <div class="indicator ${legClass(t.leg)}">Leg: ${legLabel(t.leg)}</div>
+      </div>
+      <dl class="kv-grid">
+        <dt>Tema</dt><dd>${esc(t.tref)}</dd>
+        <dt>Soggetto</dt><dd>${esc(t.sref)}</dd>
+        <dt>Occorrenza</dt><dd>${t.occ ?? 1}</dd>
+      </dl>`;
+
+  if (t.det) html += `<div class="section-label">Dettaglio thread</div><div class="reconstruction">${esc(t.det)}</div>`;
+
+  if (comms.length > 0) {
+    html += `<div class="section-label">Comunicazioni (${comms.length})</div>
+      <table class="comm-table"><thead><tr>
+        <th>ID</th><th>Origine</th><th>Dest.</th><th>Ruolo</th><th>Canale</th>
+      </tr></thead><tbody>`;
+    comms.forEach(c => {
+      const id = c[0];
+      let orig='', dest='', role='', ch='';
+      if (c.length >= 5) {
+        orig = esc(resolveSubject(String(c[1])));
+        dest = esc(resolveSubject(String(c[2])));
+        role = roleLabel(c[3]); ch = chLabel(c[4]);
+      } else if (c.length >= 4) {
+        orig = esc(c[1]); dest = '-'; role = roleLabel(c[2]); ch = chLabel(c[3]);
+      }
+      html += `<tr data-comm-id="${id}">
+        ${commIdCell(id, orderId)}<td>${orig}</td><td>${dest}</td>
+        <td>${role}</td><td>${ch}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+  }
+
+  if (acts.length > 0) {
+    html += `<div class="section-label">Azioni (${acts.length})</div>`;
+    acts.forEach(a => { html += renderActionCard(a, orderId); });
+  }
+
+  html += '</div></div>';
+  return html;
+}
+
+/* ──────────────────── All comms card ──────────────────── */
+function renderAllCommsCard(cMap, orderId) {
+  const comms = Object.values(cMap).sort((a,b) => (a.id ?? 0) - (b.id ?? 0));
+  let html = `<div class="card">
+    <div class="card-header">${chevronSvg()} Comunicazioni originali <span class="badge">${comms.length} comunicazioni</span></div>
+    <div class="card-body">
+      <table class="all-comms-table"><thead><tr>
+        <th>ID</th><th>Tipo</th><th>Timestamp</th><th>Ticket</th><th>Origine</th><th>Owner</th><th>Anteprima</th>
+      </tr></thead><tbody>`;
+  comms.forEach(c => {
+    const id = c.id ?? 0;
+    const preview = (c.body ?? '').substring(0, 80).replace(/\n/g, ' ');
+    html += `<tr onclick="openModal('${esc(orderId)}',${id})">
+      <td class="mono">${id}</td>
+      <td>${esc(c.type)}</td>
+      <td style="white-space:nowrap">${esc(c.timestamp ?? '')}</td>
+      <td class="mono">${esc(c.ticket_id ?? '')}</td>
+      <td>${esc(c.ticket_origin ?? '')}</td>
+      <td>${esc(c.owner ?? '')}</td>
+      <td class="body-preview">${esc(preview)}</td>
+    </tr>`;
+  });
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+/* ──────────────────── Expanded rendering ──────────────────── */
+function renderExpanded(data, orderId) {
+  const s = data.summary ?? {};
+  const threads = data.threads ?? [];
+  let html = '<p style="padding:10px;color:var(--text-sec);font-size:13px;">Formato espanso rilevato.</p>';
+
+  html += `<div class="card">
+    <div class="card-header">${chevronSvg()} Riepilogo <span class="badge">${esc(s.order_id ?? '')}</span></div>
+    <div class="card-body open">
+      <div class="indicators">
+        <div class="indicator">${esc(s.sentiment ?? '')}</div>
+        <div class="indicator">${esc(s.churn_risk ?? '')}</div>
+        <div class="indicator">${esc(s.legal_risk ?? '')}</div>
+      </div>
+      <dl class="kv-grid">
+        <dt>Ordine</dt><dd>${esc(s.order_id)}</dd>
+        <dt>Pagamento</dt><dd>${esc(s.payment_method)}</dd>
+        <dt>Canale</dt><dd>${esc(s.order_channel)}</dd>
+      </dl>
+    </div></div>`;
+
+  if (s.case_reconstruction) {
+    html += `<div class="card"><div class="card-header">${chevronSvg()} Ricostruzione</div>
+      <div class="card-body"><div class="reconstruction">${esc(s.case_reconstruction)}</div></div></div>`;
+  }
+
+  if (s.case_actions?.length) {
+    html += `<div class="card"><div class="card-header">${chevronSvg()} Azioni caso <span class="badge">${s.case_actions.length}</span></div>
+      <div class="card-body">${s.case_actions.map(a => renderExpandedAction(a, orderId)).join('')}</div></div>`;
+  }
+
+  threads.forEach(t => {
+    const acts = t.actions ?? [];
+    const comms = t.communications ?? [];
+    html += `<div class="card thread-card">
+      <div class="card-header">${chevronSvg()}
+        <div class="thread-title"><span class="tid">T${t.thread_id}</span>
+        <span>${esc(t.theme_name ?? t.theme_ref)}</span></div>
+        <span class="badge">${comms.length} comms / ${acts.length} azioni</span>
+      </div>
+      <div class="card-body">
+        <div class="indicators">
+          <div class="indicator">${esc(t.sentiment ?? '')}</div>
+          <div class="indicator">${esc(t.churn_risk ?? '')}</div>
+          <div class="indicator">${esc(t.legal_risk ?? '')}</div>
+        </div>
+        <dl class="kv-grid">
+          <dt>Tema</dt><dd>${esc(t.theme_name ?? t.theme_ref)}</dd>
+          <dt>Soggetto</dt><dd>${esc(t.soggetto_name ?? t.soggetto_ref)}</dd>
+        </dl>`;
+    if (t.details) html += `<div class="section-label">Dettaglio</div><div class="reconstruction">${esc(t.details)}</div>`;
+    if (comms.length) {
+      html += `<div class="section-label">Comunicazioni (${comms.length})</div>
+        <table class="comm-table"><thead><tr><th>ID</th><th>Origine</th><th>Dest.</th><th>Ruolo</th><th>Canale</th></tr></thead><tbody>`;
+      comms.forEach(c => {
+        const cid = c.communication_id;
+        html += `<tr data-comm-id="${cid}">
+          ${commIdCell(cid, orderId)}<td>${esc(c.origin ?? '')}</td>
+          <td>${esc(c.dest ?? '')}</td><td>${esc(c.role ?? '')}</td><td>${esc(c.channel ?? '')}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+    }
+    if (acts.length) {
+      html += `<div class="section-label">Azioni (${acts.length})</div>`;
+      acts.forEach(a => { html += renderExpandedAction(a, orderId); });
+    }
+    html += '</div></div>';
+  });
+
+  const cMap = commsDb[orderId];
+  if (cMap) html += renderAllCommsCard(cMap, orderId);
+
+  if (data.thread_identifier_notes) {
+    html += `<div class="card"><div class="card-header">${chevronSvg()} Note Thread Identifier</div>
+      <div class="card-body"><div class="notes-block">${esc(data.thread_identifier_notes)}</div></div></div>`;
+  }
+  if (data.agent_notes) {
+    html += `<div class="card"><div class="card-header">${chevronSvg()} Note Action Identifier</div>
+      <div class="card-body"><div class="notes-block">${esc(data.agent_notes)}</div></div></div>`;
+  }
+  return html;
+}
+
+function renderExpandedAction(a, orderId) {
+  const commIds = a.communications ?? a.acm ?? [];
+  const ref = a.action_ref ?? a.aref ?? '';
+  const name = a.action_name ?? ref;
+  const det = a.details ?? a.det ?? '';
+  const missing = (a.missing_action || a.ma) ? ' missing' : '';
+  const missingTag = (a.missing_action || a.ma) ? ' <span style="color:var(--red);font-size:11px;">[MISSING]</span>' : '';
+  const commsHtml = commIds.map(c => commLink(c, orderId)).join('');
+  return `<div class="action-card">
+    <div class="action-ref${missing}">${esc(name)}${missingTag}
+      <button class="btn-small" style="margin-left:8px" onclick="highlightComms(this, [${commIds.join(',')}])">Evidenzia comms</button>
+    </div>
+    <div class="action-det">${esc(det)}</div>
+    <div class="action-comms">Comunicazioni: ${commsHtml || '<em>nessuna</em>'}</div>
+  </div>`;
+}
+
+/* ──────────────────── Highlight ──────────────────── */
+function highlightComms(btn, commIds) {
+  const isActive = btn.classList.contains('active');
+  document.querySelectorAll('.comm-table tr.highlight').forEach(r => r.classList.remove('highlight'));
+  document.querySelectorAll('.btn-small.active').forEach(b => b.classList.remove('active'));
+  if (isActive) return;
+
+  btn.classList.add('active');
+  const idSet = new Set(commIds.map(String));
+  document.querySelectorAll('.comm-table tr[data-comm-id]').forEach(row => {
+    if (idSet.has(row.dataset.commId)) {
+      row.classList.add('highlight');
+      row.closest('.card-body')?.classList.add('open');
+      const chev = row.closest('.card')?.querySelector('.chevron');
+      if (chev) chev.classList.add('open');
+    }
+  });
+  const first = document.querySelector('.comm-table tr.highlight');
+  if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/* ──────────────────── Drop zone & file inputs ──────────────────── */
+const dz = document.getElementById('drop-zone');
+const fi = document.getElementById('file-input');
+const commsInput = document.getElementById('comms-file-input');
+
+dz.addEventListener('click', () => fi.click());
+fi.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+commsInput.addEventListener('change', e => { if (e.target.files[0]) loadCommsFile(e.target.files[0]); });
+
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+</script>
+</body>
+</html>
