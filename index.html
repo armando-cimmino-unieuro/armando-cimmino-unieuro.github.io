@@ -307,6 +307,14 @@ function roleLabel(v) { return ROLE[v] ?? v; }
 function chLabel(v) { return CHANNEL[v] ?? v; }
 function resolveSubject(code) { return code === '-' ? 'N/A' : `S.${code}`; }
 
+const SENTIMENT_REV = Object.fromEntries(Object.entries(SENTIMENT).map(([k,v]) => [v, +k]));
+const CHURN_REV = Object.fromEntries(Object.entries(CHURN).map(([k,v]) => [v, +k]));
+const LEGAL_REV = Object.fromEntries(Object.entries(LEGAL).map(([k,v]) => [v, +k]));
+
+function senClassFromLabel(v) { if (v == null) return 'sen-null'; const n = SENTIMENT_REV[v]; return n != null ? `sen-${n}` : 'sen-null'; }
+function chrClassFromLabel(v) { if (v == null) return 'chr-0'; const n = CHURN_REV[v]; return n != null ? `chr-${n}` : 'chr-0'; }
+function legClassFromLabel(v) { if (v == null) return 'leg-0'; const n = LEGAL_REV[v]; return n != null ? `leg-${n}` : 'leg-0'; }
+
 function chevronSvg() {
   return '<svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"/></svg>';
 }
@@ -342,8 +350,15 @@ function parseCases(data) {
 
 function extractCompact(data) {
   if (data.thread_analysis) {
+    const compact = data.thread_analysis;
+    if (data.sum?.ca && compact.sum && !compact.sum.ca) {
+      compact.sum.ca = data.sum.ca;
+    }
+    if (data.ti_notes && !compact.ti_notes) {
+      compact.ti_notes = data.ti_notes;
+    }
     return {
-      compact: data.thread_analysis, isExpanded: false,
+      compact, isExpanded: false,
       extra: { order_details: data.order_details, notes: data.notes, mode: data.mode, communications: data.communications }
     };
   }
@@ -744,53 +759,85 @@ function renderAllCommsCard(cMap, orderId) {
 function renderExpanded(data, orderId) {
   const s = data.summary ?? {};
   const threads = data.threads ?? [];
-  let html = '<p style="padding:10px;color:var(--text-sec);font-size:13px;">Formato espanso rilevato.</p>';
+  const ca = s.case_actions ?? [];
+  let html = '';
+
+  const totalComms = threads.reduce((n, t) => n + (t.communications?.length ?? 0), 0);
+  const totalActs = ca.length + threads.reduce((n, t) => n + (t.actions?.length ?? 0), 0);
+  const uniqueActions = new Set([
+    ...ca.map(a => a.action_ref),
+    ...threads.flatMap(t => (t.actions ?? []).map(a => a.action_ref))
+  ]);
 
   html += `<div class="card">
-    <div class="card-header">${chevronSvg()} Riepilogo <span class="badge">${esc(s.order_id ?? '')}</span></div>
+    <div class="card-header">${chevronSvg()} Riepilogo caso <span class="badge">${esc(s.order_id ?? '')}</span></div>
     <div class="card-body open">
+      <div class="stats-row">
+        <div class="stat-box"><div class="stat-val">${threads.length}</div><div class="stat-lbl">Thread</div></div>
+        <div class="stat-box"><div class="stat-val">${totalComms}</div><div class="stat-lbl">Comunicazioni</div></div>
+        <div class="stat-box"><div class="stat-val">${totalActs}</div><div class="stat-lbl">Azioni totali</div></div>
+        <div class="stat-box"><div class="stat-val">${uniqueActions.size}</div><div class="stat-lbl">Azioni uniche</div></div>
+      </div>
       <div class="indicators">
-        <div class="indicator">${esc(s.sentiment ?? '')}</div>
-        <div class="indicator">${esc(s.churn_risk ?? '')}</div>
-        <div class="indicator">${esc(s.legal_risk ?? '')}</div>
+        <div class="indicator ${senClassFromLabel(s.sentiment)}">Sentiment: ${esc(s.sentiment ?? 'N/D')}</div>
+        <div class="indicator ${chrClassFromLabel(s.churn_risk)}">Churn: ${esc(s.churn_risk ?? 'N/D')}</div>
+        <div class="indicator ${legClassFromLabel(s.legal_risk)}">Legale: ${esc(s.legal_risk ?? 'N/A')}</div>
       </div>
       <dl class="kv-grid">
-        <dt>Ordine</dt><dd>${esc(s.order_id)}</dd>
-        <dt>Pagamento</dt><dd>${esc(s.payment_method)}</dd>
-        <dt>Canale</dt><dd>${esc(s.order_channel)}</dd>
-      </dl>
-    </div></div>`;
+        <dt>Ordine</dt><dd>${esc(s.order_id ?? 'N/A')}</dd>
+        <dt>Pagamento</dt><dd>${esc(s.payment_method ?? 'N/A')}</dd>
+        <dt>Canale ordine</dt><dd>${esc(s.order_channel ?? 'N/A')}</dd>`;
+  if (s.payment_method_inferred) html += `<dt>Pagamento (infer.)</dt><dd>${esc(s.payment_method_inferred)}</dd>`;
+  if (s.order_channel_inferred) html += `<dt>Canale (infer.)</dt><dd>${esc(s.order_channel_inferred)}</dd>`;
+  if (s.other_order_ids_mentioned?.length) html += `<dt>Altri ordini</dt><dd>${s.other_order_ids_mentioned.map(esc).join(', ')}</dd>`;
+  if (s.booking_ids_mentioned?.length) html += `<dt>Prenotazioni</dt><dd>${s.booking_ids_mentioned.map(esc).join(', ')}</dd>`;
+  if (s.external_tickets?.length) html += `<dt>Ticket esterni</dt><dd>${s.external_tickets.map(esc).join(', ')}</dd>`;
+  if (s.case_start_timestamp) html += `<dt>Inizio caso</dt><dd>${esc(s.case_start_timestamp)}</dd>`;
+  if (s.case_end_timestamp) html += `<dt>Fine caso</dt><dd>${esc(s.case_end_timestamp)}</dd>`;
+  html += `</dl></div></div>`;
 
   if (s.case_reconstruction) {
-    html += `<div class="card"><div class="card-header">${chevronSvg()} Ricostruzione</div>
+    html += `<div class="card"><div class="card-header">${chevronSvg()} Ricostruzione del caso</div>
       <div class="card-body"><div class="reconstruction">${esc(s.case_reconstruction)}</div></div></div>`;
   }
 
-  if (s.case_actions?.length) {
-    html += `<div class="card"><div class="card-header">${chevronSvg()} Azioni caso <span class="badge">${s.case_actions.length}</span></div>
-      <div class="card-body">${s.case_actions.map(a => renderExpandedAction(a, orderId)).join('')}</div></div>`;
+  if (data.order_details) html += renderOrderCard(data.order_details);
+
+  if (ca.length > 0) {
+    html += `<div class="card"><div class="card-header">${chevronSvg()} Azioni a livello caso <span class="badge">${ca.length} azioni</span></div>
+      <div class="card-body">${ca.map(a => renderExpandedAction(a, orderId)).join('')}</div></div>`;
   }
 
   threads.forEach(t => {
     const acts = t.actions ?? [];
     const comms = t.communications ?? [];
-    html += `<div class="card thread-card">
-      <div class="card-header">${chevronSvg()}
+    const mtLabel = t.missing_theme ? ' [MISSING THEME]' : '';
+
+    html += `<div class="card thread-card" id="thread-${t.thread_id}">
+      <div class="card-header">
+        ${chevronSvg()}
         <div class="thread-title"><span class="tid">T${t.thread_id}</span>
-        <span>${esc(t.theme_name ?? t.theme_ref)}</span></div>
+          <span>${esc(t.theme_name ?? t.theme_ref)}${esc(mtLabel)}</span></div>
         <span class="badge">${comms.length} comms / ${acts.length} azioni</span>
       </div>
       <div class="card-body">
         <div class="indicators">
-          <div class="indicator">${esc(t.sentiment ?? '')}</div>
-          <div class="indicator">${esc(t.churn_risk ?? '')}</div>
-          <div class="indicator">${esc(t.legal_risk ?? '')}</div>
+          <div class="indicator ${senClassFromLabel(t.sentiment)}">Sent: ${esc(t.sentiment ?? 'N/D')}</div>
+          <div class="indicator ${chrClassFromLabel(t.churn_risk)}">Churn: ${esc(t.churn_risk ?? 'N/D')}</div>
+          <div class="indicator ${legClassFromLabel(t.legal_risk)}">Leg: ${esc(t.legal_risk ?? 'N/A')}</div>
         </div>
         <dl class="kv-grid">
           <dt>Tema</dt><dd>${esc(t.theme_name ?? t.theme_ref)}</dd>
           <dt>Soggetto</dt><dd>${esc(t.soggetto_name ?? t.soggetto_ref)}</dd>
+          <dt>Occorrenza</dt><dd>${t.occurrence_number ?? 1}</dd>
         </dl>`;
-    if (t.details) html += `<div class="section-label">Dettaglio</div><div class="reconstruction">${esc(t.details)}</div>`;
+
+    if (t.details) html += `<div class="section-label">Dettaglio thread</div><div class="reconstruction">${esc(t.details)}</div>`;
+
+    if (t.start_timestamp) {
+      html += `<div class="section-label">Periodo</div><p style="font-size:13px">${esc(t.start_timestamp)} &rarr; ${esc(t.end_timestamp)}</p>`;
+    }
+
     if (comms.length) {
       html += `<div class="section-label">Comunicazioni (${comms.length})</div>
         <table class="comm-table"><thead><tr><th>ID</th><th>Origine</th><th>Dest.</th><th>Ruolo</th><th>Canale</th></tr></thead><tbody>`;
@@ -803,10 +850,12 @@ function renderExpanded(data, orderId) {
       });
       html += '</tbody></table>';
     }
+
     if (acts.length) {
       html += `<div class="section-label">Azioni (${acts.length})</div>`;
       acts.forEach(a => { html += renderExpandedAction(a, orderId); });
     }
+
     html += '</div></div>';
   });
 
