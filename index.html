@@ -332,6 +332,17 @@ let currentModalCommId = null;
 
 /* ──────────────────── Parsing ──────────────────── */
 function parseCases(data) {
+  // Pipeline batch: array di record con CASE_KEY e ANALYSIS
+  if (Array.isArray(data) && data.length > 0 && data[0].CASE_KEY != null) {
+    return data
+      .filter(r => r.STATUS === 'SUCCESS' && r.ANALYSIS)
+      .map(r => {
+        const analysis = typeof r.ANALYSIS === 'string' ? JSON.parse(r.ANALYSIS) : r.ANALYSIS;
+        const c = extractCompact(analysis);
+        c.caseId = r.CASE_KEY;
+        return c;
+      });
+  }
   if (data.metadata && data.results) {
     return data.results.map((r, i) => {
       const caseId = r.case_id ?? `case_${i}`;
@@ -388,7 +399,10 @@ function loadCommsFile(file) {
       let arr = Array.isArray(data) ? data : [data];
       let count = 0;
       arr.forEach(caseObj => {
-        const oid = caseObj.order_details?.order_id;
+        let oid = caseObj.order_details?.order_id;
+        if (!oid && caseObj.communications?.length > 0) {
+          oid = String(caseObj.communications[0].ticket_id);
+        }
         if (!oid) return;
         const map = {};
         (caseObj.communications ?? []).forEach(comm => {
