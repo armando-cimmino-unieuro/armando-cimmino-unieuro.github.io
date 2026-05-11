@@ -689,12 +689,13 @@ function renderThreadCard(t, orderId) {
   const comms = t.comms ?? [];
   const acts = t.acts ?? [];
   const missingTheme = t.mt ? ' [MISSING THEME]' : '';
+  const secBadge = t.sec ? ' <span style="font-size:10px;background:#e0e7ff;color:#4338ca;padding:1px 6px;border-radius:4px;font-weight:500;">SECONDARIO</span>' : '';
 
   let html = `<div class="card thread-card" id="thread-${t.tid}">
     <div class="card-header">
       ${chevronSvg()}
       <div class="thread-title"><span class="tid">T${t.tid}</span>
-        <span>${esc(t.tref)}${esc(missingTheme)}</span></div>
+        <span>${esc(t.tref)}${esc(missingTheme)}${secBadge}</span></div>
       <span class="badge">${comms.length} comms / ${acts.length} azioni</span>
     </div>
     <div class="card-body">
@@ -705,6 +706,7 @@ function renderThreadCard(t, orderId) {
       </div>
       <dl class="kv-grid">
         <dt>Tema</dt><dd>${esc(t.tref)}</dd>
+        <dt>Tipo</dt><dd>${t.sec ? 'Secondario' : 'Primario'}</dd>
         <dt>Soggetto</dt><dd>${esc(t.sref)}</dd>
         <dt>Occorrenza</dt><dd>${t.occ ?? 1}</dd>
       </dl>`;
@@ -826,12 +828,13 @@ function renderExpanded(data, orderId) {
     const acts = t.actions ?? [];
     const comms = t.communications ?? [];
     const mtLabel = t.missing_theme ? ' [MISSING THEME]' : '';
+    const secExpBadge = t.secondary_theme ? ' <span style="font-size:10px;background:#e0e7ff;color:#4338ca;padding:1px 6px;border-radius:4px;font-weight:500;">SECONDARIO</span>' : '';
 
     html += `<div class="card thread-card" id="thread-${t.thread_id}">
       <div class="card-header">
         ${chevronSvg()}
         <div class="thread-title"><span class="tid">T${t.thread_id}</span>
-          <span>${esc(t.theme_name ?? t.theme_ref)}${esc(mtLabel)}</span></div>
+          <span>${esc(t.theme_name ?? t.theme_ref)}${esc(mtLabel)}${secExpBadge}</span></div>
         <span class="badge">${comms.length} comms / ${acts.length} azioni</span>
       </div>
       <div class="card-body">
@@ -842,6 +845,7 @@ function renderExpanded(data, orderId) {
         </div>
         <dl class="kv-grid">
           <dt>Tema</dt><dd>${esc(t.theme_name ?? t.theme_ref)}</dd>
+          <dt>Tipo</dt><dd>${t.secondary_theme ? 'Secondario' : 'Primario'}</dd>
           <dt>Soggetto</dt><dd>${esc(t.soggetto_name ?? t.soggetto_ref)}</dd>
           <dt>Occorrenza</dt><dd>${t.occurrence_number ?? 1}</dd>
         </dl>`;
