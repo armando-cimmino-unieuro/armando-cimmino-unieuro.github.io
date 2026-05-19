@@ -242,6 +242,36 @@ header .case-nav .counter { font-size: 12px; opacity: .6; }
   max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   color: var(--text-sec); font-size: 11px;
 }
+
+/* ── Contacts grid ── */
+.contacts-grid {
+  display: flex; gap: 16px; flex-wrap: wrap; margin: 6px 0 10px;
+  font-size: 12px;
+}
+.contacts-col {
+  background: #f9fafb; border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px 12px; min-width: 140px; flex: 1;
+}
+.contacts-col strong { font-size: 11px; text-transform: uppercase; letter-spacing: .3px; color: var(--text-sec); }
+.contacts-col ul { list-style: none; margin-top: 4px; }
+.contacts-col li { padding: 1px 0; }
+
+/* ── Action path / id / occurrences ── */
+.action-path {
+  display: inline-block; font-size: 10px; color: var(--text-sec);
+  background: #f0f0f0; padding: 1px 6px; border-radius: 3px; margin-left: 6px;
+  font-family: monospace;
+}
+.action-id {
+  display: inline-block; font-size: 10px; color: #fff; background: var(--accent);
+  padding: 1px 6px; border-radius: 3px; margin-right: 6px; font-weight: 700;
+  font-family: monospace;
+}
+.action-occ {
+  display: inline-block; font-size: 10px; color: var(--purple);
+  background: #f3e8ff; border: 1px solid #e9d5ff; padding: 1px 6px;
+  border-radius: 3px; margin-left: 6px; font-weight: 600;
+}
 </style>
 </head>
 <body>
@@ -778,7 +808,7 @@ function renderExpanded(data, orderId) {
   const ca = s.case_actions ?? [];
   let html = '';
 
-  const totalComms = threads.reduce((n, t) => n + (t.communications?.length ?? 0), 0);
+  const totalComms = s.contacts?.total_unique ?? threads.reduce((n, t) => n + (t.communications?.length ?? 0), 0);
   const totalActs = ca.length + threads.reduce((n, t) => n + (t.actions?.length ?? 0), 0);
   const uniqueActions = new Set([
     ...ca.map(a => a.action_ref),
@@ -798,8 +828,22 @@ function renderExpanded(data, orderId) {
         <div class="indicator ${senClassFromLabel(s.sentiment)}">Sentiment: ${esc(s.sentiment ?? 'N/D')}</div>
         <div class="indicator ${chrClassFromLabel(s.churn_risk)}">Churn: ${esc(s.churn_risk ?? 'N/D')}</div>
         <div class="indicator ${legClassFromLabel(s.legal_risk)}">Legale: ${esc(s.legal_risk ?? 'N/A')}</div>
-      </div>
-      <dl class="kv-grid">
+      </div>`;
+  if (s.contacts) {
+    html += `<div class="section-label">Contatti</div><div class="contacts-grid">`;
+    if (s.contacts.by_origin) {
+      html += `<div class="contacts-col"><strong>Per origine</strong><ul>`;
+      Object.entries(s.contacts.by_origin).forEach(([k,v]) => { html += `<li>${esc(k)}: <strong>${v}</strong></li>`; });
+      html += `</ul></div>`;
+    }
+    if (s.contacts.by_channel) {
+      html += `<div class="contacts-col"><strong>Per canale</strong><ul>`;
+      Object.entries(s.contacts.by_channel).forEach(([k,v]) => { html += `<li>${esc(k)}: <strong>${v}</strong></li>`; });
+      html += `</ul></div>`;
+    }
+    html += `</div>`;
+  }
+  html += `<dl class="kv-grid">
         <dt>Ordine</dt><dd>${esc(s.order_id ?? 'N/A')}</dd>
         <dt>Pagamento</dt><dd>${esc(s.payment_method ?? 'N/A')}</dd>
         <dt>Canale ordine</dt><dd>${esc(s.order_channel ?? 'N/A')}</dd>`;
@@ -830,12 +874,15 @@ function renderExpanded(data, orderId) {
     const mtLabel = t.missing_theme ? ' [MISSING THEME]' : '';
     const secExpBadge = t.secondary_theme ? ' <span style="font-size:10px;background:#e0e7ff;color:#4338ca;padding:1px 6px;border-radius:4px;font-weight:500;">SECONDARIO</span>' : '';
 
+    const tContacts = t.contacts;
+    const tCommsCount = tContacts?.total ?? comms.length;
+
     html += `<div class="card thread-card" id="thread-${t.thread_id}">
       <div class="card-header">
         ${chevronSvg()}
         <div class="thread-title"><span class="tid">T${t.thread_id}</span>
           <span>${esc(t.theme_name ?? t.theme_ref)}${esc(mtLabel)}${secExpBadge}</span></div>
-        <span class="badge">${comms.length} comms / ${acts.length} azioni</span>
+        <span class="badge">${tCommsCount} comms / ${acts.length} azioni</span>
       </div>
       <div class="card-body">
         <div class="indicators">
@@ -847,8 +894,35 @@ function renderExpanded(data, orderId) {
           <dt>Tema</dt><dd>${esc(t.theme_name ?? t.theme_ref)}</dd>
           <dt>Tipo</dt><dd>${t.secondary_theme ? 'Secondario' : 'Primario'}</dd>
           <dt>Soggetto</dt><dd>${esc(t.soggetto_name ?? t.soggetto_ref)}</dd>
-          <dt>Occorrenza</dt><dd>${t.occurrence_number ?? 1}</dd>
-        </dl>`;
+          <dt>Occorrenza</dt><dd>${t.occurrence_number ?? 1}</dd>`;
+    if (t.theme_path) html += `<dt>Percorso tema</dt><dd>${[t.theme_path.LVL1, t.theme_path.LVL2, t.theme_path.LVL3].filter(x => x != null).join('.')}</dd>`;
+    if (t.soggetto_path) html += `<dt>Percorso sogg.</dt><dd>${[t.soggetto_path.LVL1, t.soggetto_path.LVL2, t.soggetto_path.LVL3].filter(x => x != null).join('.')}</dd>`;
+    html += `</dl>`;
+
+    if (tContacts) {
+      html += `<div class="section-label">Contatti thread (${tContacts.total ?? ''})</div><div class="contacts-grid">`;
+      if (tContacts.by_origin) {
+        html += `<div class="contacts-col"><strong>Origine</strong><ul>`;
+        Object.entries(tContacts.by_origin).forEach(([k,v]) => { html += `<li>${esc(k)}: <strong>${v}</strong></li>`; });
+        html += `</ul></div>`;
+      }
+      if (tContacts.by_role) {
+        html += `<div class="contacts-col"><strong>Ruolo</strong><ul>`;
+        Object.entries(tContacts.by_role).forEach(([k,v]) => { html += `<li>${esc(k)}: <strong>${v}</strong></li>`; });
+        html += `</ul></div>`;
+      }
+      if (tContacts.by_channel) {
+        html += `<div class="contacts-col"><strong>Canale</strong><ul>`;
+        Object.entries(tContacts.by_channel).forEach(([k,v]) => { html += `<li>${esc(k)}: <strong>${v}</strong></li>`; });
+        html += `</ul></div>`;
+      }
+      if (tContacts.by_dest) {
+        html += `<div class="contacts-col"><strong>Destinazione</strong><ul>`;
+        Object.entries(tContacts.by_dest).forEach(([k,v]) => { html += `<li>${esc(k)}: <strong>${v}</strong></li>`; });
+        html += `</ul></div>`;
+      }
+      html += `</div>`;
+    }
 
     if (t.details) html += `<div class="section-label">Dettaglio thread</div><div class="reconstruction">${esc(t.details)}</div>`;
 
@@ -885,8 +959,12 @@ function renderExpanded(data, orderId) {
       <div class="card-body"><div class="notes-block">${esc(data.thread_identifier_notes)}</div></div></div>`;
   }
   if (data.agent_notes) {
-    html += `<div class="card"><div class="card-header">${chevronSvg()} Note Action Identifier</div>
+    html += `<div class="card"><div class="card-header">${chevronSvg()} Note Agente (Thread)</div>
       <div class="card-body"><div class="notes-block">${esc(data.agent_notes)}</div></div></div>`;
+  }
+  if (data.action_identifier_notes) {
+    html += `<div class="card"><div class="card-header">${chevronSvg()} Note Agente (Azioni)</div>
+      <div class="card-body"><div class="notes-block">${esc(data.action_identifier_notes)}</div></div></div>`;
   }
   return html;
 }
@@ -898,9 +976,12 @@ function renderExpandedAction(a, orderId) {
   const det = a.details ?? a.det ?? '';
   const missing = (a.missing_action || a.ma) ? ' missing' : '';
   const missingTag = (a.missing_action || a.ma) ? ' <span style="color:var(--red);font-size:11px;">[MISSING]</span>' : '';
+  const pathTag = a.action_path ? `<span class="action-path">${[a.action_path.LVL1, a.action_path.LVL2, a.action_path.LVL3].filter(x => x != null).join('.')}</span>` : '';
+  const idTag = a.action_id != null ? `<span class="action-id">#${a.action_id}</span>` : '';
+  const occTag = (a.action_occurrences != null && a.action_occurrences > 1) ? `<span class="action-occ">occ. ${a.action_occurrences}</span>` : '';
   const commsHtml = commIds.map(c => commLink(c, orderId)).join('');
   return `<div class="action-card">
-    <div class="action-ref${missing}">${esc(name)}${missingTag}
+    <div class="action-ref${missing}">${idTag}${esc(name)}${pathTag}${occTag}${missingTag}
       <button class="btn-small" style="margin-left:8px" onclick="highlightComms(this, [${commIds.join(',')}])">Evidenzia comms</button>
     </div>
     <div class="action-det">${esc(det)}</div>
